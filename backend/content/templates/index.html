@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Django + Vite 集成{% endblock %}
+
+{% block head_extra %}
+    {% if not debug %}
+        <link rel="stylesheet" href="{% static 'dist/assets/index.css' %}">
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div id="vite_root" class="min-h-screen w-full" data-models="{{ models_json }}">
+        <div class="flex min-h-[40vh] flex-col items-center justify-center gap-4 px-6 py-10 text-center">
+            <span class="loading loading-spinner loading-lg text-primary" aria-hidden="true"></span>
+            <p class="text-lg font-semibold">正在载入 React 界面…</p>
+            <p class="max-w-xl text-sm text-base-content/70">
+                如果 Tailwind 与 daisyUI 正常工作，你会看到前端应用自动挂载在这里。
+            </p>
+        </div>
+    </div>
+{% endblock %}
+
+{% block body_scripts %}
+    {% if debug %}
+      <!-- ✅ 开发模式：Vite 热更新 -->
+      <script type="module" src="http://47.242.1.178:12356/@vite/client"></script>
+      <script type="module">
+        import RefreshRuntime from 'http://47.242.1.178:12356/@react-refresh'
+
+        RefreshRuntime.injectIntoGlobalHook(window)
+        window.$RefreshReg$ = () => {}
+        window.$RefreshSig$ = () => (type) => type
+        window.__vite_plugin_react_preamble_installed__ = true
+      </script>
+      <script type="module" src="http://47.242.1.178:12356/src/main.tsx"></script>
+    {% else %}
+      <!-- ✅ 生产模式：加载静态打包文件 -->
+      <link rel="stylesheet" href="{% static 'dist/assets/index.css' %}">
+      <script type="module" src="{% static 'dist/assets/index.js' %}"></script>
+    {% endif %}
+{% endblock %}
