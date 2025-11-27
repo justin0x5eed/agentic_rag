@@ -30,6 +30,7 @@ MODELS = {
 ALLOWED_FILE_TYPES = {"txt", "doc", "docx"}
 MAX_FILE_SIZE_BYTES = 1 * 1024 * 1024  # 1 MB
 REDIS_INDEX_NAME = "idx_chunks"
+TTL_SECONDS = 1 * 24 * 60 * 60
 METADATA_SCHEMA = [
     {"name": "source", "type": "tag"},
 ]
@@ -77,7 +78,6 @@ def escape_tag_value(value: str) -> str:
     """
 
     return re.sub(r"([,.<>{}\[\]\"':;!@#$%^&*()\-+=~\s])", r"\\\1", str(value))
-
 
 
 def _delete_existing_sources(redis_url: str, index_name: str, sources: set[str]) -> set[str]:
@@ -269,6 +269,28 @@ def upload_document(request):
             {"detail": f"Unable to store document chunks in Redis: {exc}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+    try:
+        client = redis.from_url(redis_url, decode_responses=True)
+        search = client.ft(REDIS_INDEX_NAME)
+
+        for source in sources_to_replace:
+            escaped_source = escape_tag_value(source)
+            query_string = f"@source:{{{escaped_source}}}"
+
+            try:
+                result = search.search(
+                    Query(query_string).return_fields().paging(0, 5000)
+                )
+                docs = getattr(result, "docs", [])
+
+                for doc in docs:
+                    client.expire(doc.id, TTL_SECONDS)
+
+            except Exception as exc:  # pragma: no cover - best-effort TTL application
+                print(f"[TTL] Failed to set TTL for '{source}': {exc}")
+    except redis.exceptions.RedisError:
+        pass
 
     if len(per_file_results) == 1:
         return Response(per_file_results[0], status=status.HTTP_200_OK)
